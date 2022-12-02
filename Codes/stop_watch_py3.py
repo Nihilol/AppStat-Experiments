@@ -12,14 +12,15 @@
 from time import time
 import os,sys
 
-name = "timer_output.dat"
+name = "timer_output2_alex.dat"
 
 n = 0
 while (os.path.isfile(name)):
     print("The file ",name," already exists in this directory.")
     name = input("Please enter a new name for your output file: ")
     
-newname = name
+newname = "alex_output.dat"
+
     
 # Make some check about the string entered
 if len(newname)==0:
