@@ -38,17 +38,19 @@ h_mean, h_uncert = weighted_error_prop_mean(df['h (mm)'], df['h_sig (mm)'])
 
 
 def angle(Hyp, Opp, Hyp_uncern, Opp_uncern):                        # Assuming the lengths are not correlated
-    x, y = symbols("x, y")
-    dx, dy = symbols("sigma_x, sigma_y")
-    Theta = atan(x/y)
-    dTheta = sqrt((Theta.diff(x)*dx)**2 + (Theta.diff(y)*dy)**2)
-    fTheta = lambdify((x,y), Theta)
-    fdTheta = lambdify((x, dx, y, dy), dTheta)
-    vx, vdx = Opp, Opp_uncern
-    vy, vdy = Hyp, Hyp_uncern
-    vTheta = fTheta(vx, vy)
-    vdTheta = fdTheta(vx, vdx, vy, vdy)
+    x, y = symbols("x, y")                                          # Assigning symbolic nature to variables
+    dx, dy = symbols("sigma_x, sigma_y")                            # Assigning symbolic nature to variables
+    Theta = asin(x/y)                                               # Defining the function for the angle
+    dTheta = sqrt((Theta.diff(x)*dx)**2 + (Theta.diff(y)*dy)**2)    # The function for the error propagation
+    fTheta = lambdify((x,y), Theta)                                 # Make it a numerical function
+    fdTheta = lambdify((x, dx, y, dy), dTheta)                      # Make it a numerical function
+    vx, vdx = Opp, Opp_uncern                                       # Insert values for first parameter
+    vy, vdy = Hyp, Hyp_uncern                                       # Insert values for second parameter
+    vTheta = fTheta(vx, vy)                                         # Calculate the numerical function
+    vdTheta = fdTheta(vx, vdx, vy, vdy)                             # Calculate the numerical function of the uncertainty
+    vTheta = (vTheta*180)/np.pi                                      # Convert output to degrees
+    vdTheta = (vdTheta*180)/np.pi                                      # Convert output to degrees
     print("The calculated angle with propagated errors is: " f"{vTheta:.2f}", "+-", f"{vdTheta:.2f}")
     return vTheta, vdTheta
 
-theta = angle(L_mean, h_mean, L_uncert, h_uncert)
+theta = angle(Hyp_mean, h_mean, Hyp_uncert, h_uncert)
