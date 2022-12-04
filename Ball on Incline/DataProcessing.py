@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import sympy as sp
+from sympy import *
 import os
 
 # Define function to calculate the error propagation in collected data using a weighted mean ------------------------------------------------
@@ -33,3 +35,20 @@ theta_mean, theta_uncert = weighted_error_prop_mean(df['theta (degrees)'], df['t
 L_mean, L_uncert = weighted_error_prop_mean(df['L (mm)'], df['L_sig (mm)'])
 Hyp_mean, Hyp_uncert = weighted_error_prop_mean(df['Hyp (mm)'], df['Hyp_sig (mm)'])
 h_mean, h_uncert = weighted_error_prop_mean(df['h (mm)'], df['h_sig (mm)'])
+
+
+def angle(Hyp, Opp, Hyp_uncern, Opp_uncern):                        # Assuming the lengths are not correlated
+    x, y = symbols("x, y")
+    dx, dy = symbols("sigma_x, sigma_y")
+    Theta = atan(x/y)
+    dTheta = sqrt((Theta.diff(x)*dx)**2 + (Theta.diff(y)*dy)**2)
+    fTheta = lambdify((x,y), Theta)
+    fdTheta = lambdify((x, dx, y, dy), dTheta)
+    vx, vdx = Opp, Opp_uncern
+    vy, vdy = Hyp, Hyp_uncern
+    vTheta = fTheta(vx, vy)
+    vdTheta = fdTheta(vx, vdx, vy, vdy)
+    print("The calculated angle with propagated errors is: " f"{vTheta:.2f}", "+-", f"{vdTheta:.2f}")
+    return vTheta, vdTheta
+
+theta = angle(L_mean, h_mean, L_uncert, h_uncert)
