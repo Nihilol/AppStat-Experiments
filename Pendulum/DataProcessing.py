@@ -3,6 +3,7 @@ import sympy
 from sympy import *
 import numpy as np
 import pandas as pd
+import sys
 
 # Define functions used in the data processing: ------------------------------------------------------------------------------------------------
 
@@ -35,26 +36,48 @@ def weighted_error_prop_mean(var_list, sig_list, name):                         
 
 # Define a symbolic function for calculation the period with Sympy, which helps calculate error propagation in symbolic expressions
 
-def period_Pendulum(val_prev, val_prev_sig, val_now, val_now_sig):                                 # Assuming the period and length are uncorrelated
-    x, y = symbols("x, y")                                          # Assigning symbolic nature to variables
-    dx, dy = symbols("sigma_x, sigma_y")                            # Assigning symbolic nature to variables
-    T = x - y                                                  # Defining the function for the angle
-    dT = sqrt((T.diff(x)*dx)**2 + (T.diff(y)*dy)**2)                # The function for the error propagation
-    fT = lambdify((x,y), T)                                         # Make it a numerical function
-    fdT = lambdify((x, dx, y, dy), dT)                              # Make it a numerical function
-    vval_now, vdval_now = val_now, val_now_sig                                              # Insert values for first parameter
-    vval_prev, vdval_prev = val_prev, val_prev_sig                                              # Insert values for second parameter
-    vT = fT(vval_now, vval_prev)                                                 # Calculate the numerical function
-    vdT = fdT(vval_now, vdval_now, vval_prev, vdval_prev)                                     # Calculate the numerical function of the uncertainty
+def period_Pendulum(val_prev, val_prev_sig, val_now, val_now_sig):                      # Assuming the period and length are uncorrelated
+    if val_prev == nan or val_now == nan:
+        sys.exit()
+    x, y = symbols("x, y")                                                              # Assigning symbolic nature to variables
+    dx, dy = symbols("sigma_x, sigma_y")                                                # Assigning symbolic nature to variables
+    T = x - y                                                                           # Defining the function for the expression
+    dT = sqrt((T.diff(x)*dx)**2 + (T.diff(y)*dy)**2)                                    # The function for the error propagation
+    fT = lambdify((x,y), T)                                                             # Make it a numerical function
+    fdT = lambdify((x, dx, y, dy), dT)                                                  # Make it a numerical function
+    vval_now, vdval_now = val_now, val_now_sig                                          # Insert values for first parameter
+    vval_prev, vdval_prev = val_prev, val_prev_sig                                      # Insert values for second parameter
+    vT = fT(vval_now, vval_prev)                                                        # Calculate the numerical function
+    vdT = fdT(vval_now, vdval_now, vval_prev, vdval_prev)                               # Calculate the numerical function of the uncertainty
     #print("The calculated period with propagated errors is: " f"{vT:.2f}", "+-", f"{vdT:.2f}")
     return vT, vdT
+
+
+def length_addition(Length, Length_sig, Weight_length, Weight_length_sig):              # Assuming the period and length are uncorrelated
+    if Length == nan or Weight_length == nan:
+        sys.exit
+    x, y = symbols("x, y")                                                              # Assigning symbolic nature to variables
+    dx, dy = symbols("sigma_x, sigma_y")                                                # Assigning symbolic nature to variables
+    L = x + (1/2)*y                                                                     # Defining the function for the expression
+    dL = sqrt((L.diff(x)*dx)**2 + (L.diff(y)*dy)**2)                                    # The function for the error propagation
+    fL = lambdify((x,y), L)                                                             # Make it a numerical function
+    fdL = lambdify((x, dx, y, dy), dL)                                                  # Make it a numerical function
+    vLength, vdLength = Length, Length_sig                                              # Insert values for first parameter
+    vWeight_length, vdWeight_length = Weight_length, Weight_length_sig                  # Insert values for second parameter
+    vL = fL(vLength, vWeight_length)                                                    # Calculate the numerical function
+    vdL = fdL(vLength, vdLength, vWeight_length, vdWeight_length)                       # Calculate the numerical function of the uncertainty
+    print("The calculated period with propagated errors is: " f"{vL:.2f}", "+-", f"{vdL:.2f}")
+    return vL, vdL
 
 # Define a symbolic function for g, to calculate error prop in symbolic functions
 
 def g_Pendulum(T, T_sig, L, L_sig):                                 # Assuming the period and length are uncorrelated
+    print(T)
+    if T == nan or L == nan:
+        sys.exit()
     x, y = symbols("x, y")                                          # Assigning symbolic nature to variables
     dx, dy = symbols("sigma_x, sigma_y")                            # Assigning symbolic nature to variables
-    g = x*(2*np.pi/y)**2                                            # Defining the function for the angle
+    g = x*(2*np.pi/y)**2                                            # Defining the function for the expression
     dg = sqrt((g.diff(x)*dx)**2 + (g.diff(y)*dy)**2)                # The function for the error propagation
     fg = lambdify((x,y), g)                                         # Make it a numerical function
     fdg = lambdify((x, dx, y, dy), dg)                              # Make it a numerical function
@@ -68,7 +91,7 @@ def g_Pendulum(T, T_sig, L, L_sig):                                 # Assuming t
 # Start working on the data-processing of the timers of the pendulum
 
 # Set data paths
-# The first path might not work on everyone computer, so be wary of that
+
 path_to_timer_dat = str(os.getcwd() + r"/alex_output_1.dat")
 path_to_data = str(os.getcwd() + r"/PendulumData.csv")
 
@@ -80,13 +103,24 @@ for i in range(len(file)):                                                      
 
 df = pd.read_csv(path_to_data)                                                              # Pandas to read the .csv file.
 
+#for i in range(len(df.columns)):
+#    df.iloc[i].dropna()
+
 T_raw_sig = df["T_raw_sig (s)"].tolist()                                                    # Pandas read sigs from data file
+
+print(len(T_raw_sig), len(array_of_times))
 
 T = np.zeros(len(array_of_times) - 1)                                                       # Initialise period array
 T_sig = np.zeros(len(array_of_times) - 1)                                                   # Initialise period_sig array
 for i in range(1, len(array_of_times)):                                                     # Iterate to calculate T and T_sig, using previous function
     T[i - 1], T_sig[i - 1] = period_Pendulum(array_of_times[i - 1], T_raw_sig[i-1], array_of_times[i], T_raw_sig[i])
 
+Length = np.zeros(len(df["w_h (m)"]))
+Length_sig = np.zeros(len(df["w_h (m)"]))
+for i in range(len(df["w_h (m)"])):
+    Length[i], Length_sig[i] = length_addition(df["Len_las (m)"][i], df["Len_las_sig (m)"][i], df["w_h (m)"][i], df["w_h_sig (m)"][i])
+
+print(Length)
 
 T_mean, T_sig_mean = weighted_error_prop_mean(T, T_sig, "period")                                    # Combine values to get weighted mean and error prop of T
 L_las_mean, L_las_mean_sig = weighted_error_prop_mean_df(df["Len_las (m)"], df["Len_las_sig (m)"])
