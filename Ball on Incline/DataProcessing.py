@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import sympy as sp
+import sympy
 from sympy import *
 import os
 
@@ -32,10 +32,13 @@ L5_mean, L5_uncert = weighted_error_prop_mean(df['L_5 (mm)'], df['L_5_sig (mm)']
 r_bball_mean, r_bball_uncert = weighted_error_prop_mean(df['r_bball (mm)'], df['r_bball_sig (mm)'])
 r_sball_mean, r_sball_uncert = weighted_error_prop_mean(df['r_sball (mm)'], df['r_sball_sig (mm)'])
 theta_mean, theta_uncert = weighted_error_prop_mean(df['theta (degrees)'], df['theta_sig (degrees)'])
+theta_rev_mean, theta_rev_uncert = weighted_error_prop_mean(df['theta_rev (degrees)'], df['theta_rev_sig (degrees)'])
 L_mean, L_uncert = weighted_error_prop_mean(df['L (mm)'], df['L_sig (mm)'])
 Hyp_mean, Hyp_uncert = weighted_error_prop_mean(df['Hyp (mm)'], df['Hyp_sig (mm)'])
 h_mean, h_uncert = weighted_error_prop_mean(df['h (mm)'], df['h_sig (mm)'])
+d_r_mean, d_r_uncert = weighted_error_prop_mean(df['d_rail (mm)'], df['d_rail_sig (mm)'])
 
+# Define function to calculate the angle of incline ------------------------------------------------------------------------------------------------
 
 def angle(Hyp, Opp, Hyp_uncern, Opp_uncern):                        # Assuming the lengths are not correlated
     x, y = symbols("x, y")                                          # Assigning symbolic nature to variables
@@ -48,9 +51,10 @@ def angle(Hyp, Opp, Hyp_uncern, Opp_uncern):                        # Assuming t
     vy, vdy = Hyp, Hyp_uncern                                       # Insert values for second parameter
     vTheta = fTheta(vx, vy)                                         # Calculate the numerical function
     vdTheta = fdTheta(vx, vdx, vy, vdy)                             # Calculate the numerical function of the uncertainty
-    vTheta = (vTheta*180)/np.pi                                      # Convert output to degrees
-    vdTheta = (vdTheta*180)/np.pi                                      # Convert output to degrees
+    vTheta = (vTheta*180)/np.pi                                     # Convert output to degrees
+    vdTheta = (vdTheta*180)/np.pi                                   # Convert output to degrees
     print("The calculated angle with propagated errors is: " f"{vTheta:.2f}", "+-", f"{vdTheta:.2f}")
     return vTheta, vdTheta
 
 theta = angle(Hyp_mean, h_mean, Hyp_uncert, h_uncert)
+
