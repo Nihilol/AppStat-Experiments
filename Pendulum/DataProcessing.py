@@ -62,14 +62,14 @@ def g_Pendulum(T, T_sig, L, L_sig):                                 # Assuming t
     vT, vdT = T, T_sig                                              # Insert values for second parameter
     vg = fg(vL, vT)                                                 # Calculate the numerical function
     vdg = fdg(vL, vdL, vT, vdT)                                     # Calculate the numerical function of the uncertainty
-    print("The calculated angle with propagated errors is: " f"{vg:.2f}", "+-", f"{vdg:.2f}")
+    print("The calculated gravitional velocity with propagated errors is: " f"{vg:.2f}", "+-", f"{vdg:.2f} using {L} as the length")
     return vg, vdg
 
 # Start working on the data-processing of the timers of the pendulum
 
 # Set data paths
 # The first path might not work on everyone computer, so be wary of that
-path_to_timer_dat = r"/home/nihilol/Desktop/Uni/Kandidat/2. Blok/AppStat/Experiments/AppStat-Experiments/Codes/alex_output_1.dat"
+path_to_timer_dat = str(os.getcwd() + r"/alex_output_1.dat")
 path_to_data = str(os.getcwd() + r"/PendulumData.csv")
 
 file = np.loadtxt(path_to_timer_dat)                                                        # Load the .dat file
@@ -82,15 +82,15 @@ df = pd.read_csv(path_to_data)                                                  
 
 T_raw_sig = df["T_raw_sig (s)"].tolist()                                                    # Pandas read sigs from data file
 
-T = np.zeros(len(array_of_times) - 1)                                                       # Initilise period array
-T_sig = np.zeros(len(array_of_times) - 1)                                                   # Intilise period_sig array
+T = np.zeros(len(array_of_times) - 1)                                                       # Initialise period array
+T_sig = np.zeros(len(array_of_times) - 1)                                                   # Initialise period_sig array
 for i in range(1, len(array_of_times)):                                                     # Iterate to calculate T and T_sig, using previous function
     T[i - 1], T_sig[i - 1] = period_Pendulum(array_of_times[i - 1], T_raw_sig[i-1], array_of_times[i], T_raw_sig[i])
 
 
 T_mean, T_sig_mean = weighted_error_prop_mean(T, T_sig, "period")                                    # Combine values to get weighted mean and error prop of T
 L_las_mean, L_las_mean_sig = weighted_error_prop_mean_df(df["Len_las (m)"], df["Len_las_sig (m)"])
-
-g = g_Pendulum(T_mean, T_sig_mean, L_las_mean, L_las_mean_sig)
-
+L_mean, L_mean_sig = weighted_error_prop_mean_df(df["Len (m)"], df["Len_sig (m)"])
+g_las = g_Pendulum(T_mean, T_sig_mean, L_las_mean, L_las_mean_sig)
+g = g_Pendulum(T_mean, T_sig_mean, L_mean, L_mean_sig)
 #print("The value of the gravitional acceleration, with no error propagation, is: "f"{g:.3f}")
