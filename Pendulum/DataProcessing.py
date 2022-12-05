@@ -29,7 +29,7 @@ def weighted_error_prop_mean(var_list, sig_list, name):                         
     for i in range(len(var_list)):                                               # Weighted mean: equation from slide 16 of "Mean and Width"
         mean += (var_list[i]/(sig_list[i]**2)) / inverse_sigsum_sq
     uncert = np.sqrt(1/inverse_sigsum_sq)                                        # Uncertainty from slide 16 of "Mean and Width"
-    print("The mean of", name, "is: ", f"{mean:.2f}", " and the uncertainty is: +-", f"{uncert:.2f}")
+    print("The mean of the", name, "is: ", f"{mean:.2f}", " and the uncertainty is: +-", f"{uncert:.2f}")
     return mean, uncert
 
 
@@ -46,7 +46,7 @@ def period_Pendulum(val_prev, val_prev_sig, val_now, val_now_sig):              
     vval_prev, vdval_prev = val_prev, val_prev_sig                                              # Insert values for second parameter
     vT = fT(vval_now, vval_prev)                                                 # Calculate the numerical function
     vdT = fdT(vval_now, vdval_now, vval_prev, vdval_prev)                                     # Calculate the numerical function of the uncertainty
-    print("The calculated angle with propagated errors is: " f"{vT:.2f}", "+-", f"{vdT:.2f}")
+    #print("The calculated period with propagated errors is: " f"{vT:.2f}", "+-", f"{vdT:.2f}")
     return vT, vdT
 
 # Define a symbolic function for g, to calculate error prop in symbolic functions
@@ -82,14 +82,15 @@ df = pd.read_csv(path_to_data)                                                  
 
 T_raw_sig = df["T_raw_sig (s)"].tolist()                                                    # Pandas read sigs from data file
 
-
 T = np.zeros(len(array_of_times) - 1)                                                       # Initilise period array
 T_sig = np.zeros(len(array_of_times) - 1)                                                   # Intilise period_sig array
 for i in range(1, len(array_of_times)):                                                     # Iterate to calculate T and T_sig, using previous function
     T[i - 1], T_sig[i - 1] = period_Pendulum(array_of_times[i - 1], T_raw_sig[i-1], array_of_times[i], T_raw_sig[i])
 
 
+T_mean, T_sig_mean = weighted_error_prop_mean(T, T_sig, "period")                                    # Combine values to get weighted mean and error prop of T
+L_las_mean, L_las_mean_sig = weighted_error_prop_mean_df(df["Len_las (m)"], df["Len_las_sig (m)"])
 
+g = g_Pendulum(T_mean, T_sig_mean, L_las_mean, L_las_mean_sig)
 
-
-print("The value of the gravitional acceleration, with no error propagation, is: "f"{g:.3f}")
+#print("The value of the gravitional acceleration, with no error propagation, is: "f"{g:.3f}")
