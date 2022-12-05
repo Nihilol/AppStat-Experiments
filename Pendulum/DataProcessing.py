@@ -54,7 +54,7 @@ def period_Pendulum(val_prev, val_prev_sig, val_now, val_now_sig):              
 def length_addition(Length, Length_sig, Weight_length, Weight_length_sig):              # Assuming the period and length are uncorrelated
     x, y = symbols("x, y")                                                              # Assigning symbolic nature to variables
     dx, dy = symbols("sigma_x, sigma_y")                                                # Assigning symbolic nature to variables
-    L = x + (1/2)*y                                                                     # Defining the function for the expression
+    L = x + (1/2)*y                                                                     # Rope + 1/2 weight, since center of mass
     dL = sqrt((L.diff(x)*dx)**2 + (L.diff(y)*dy)**2)                                    # The function for the error propagation
     fL = lambdify((x,y), L)                                                             # Make it a numerical function
     fdL = lambdify((x, dx, y, dy), dL)                                                  # Make it a numerical function
@@ -107,11 +107,11 @@ T_sig = np.zeros(len(array_of_times) - 1)                                       
 for i in range(1, len(array_of_times)):                                                     # Iterate to calculate T and T_sig, using previous function
     T[i - 1], T_sig[i - 1] = period_Pendulum(array_of_times[i - 1], T_raw_sig[i-1], array_of_times[i], T_raw_sig[i])
 
-Length_las = np.zeros(len(df["w_h (m)"]))
-Length_las_sig = np.zeros(len(df["w_h (m)"]))
-Length = np.zeros(len(df["w_h (m)"]))
-Length_sig = np.zeros(len(df["w_h (m)"]))
-for i in range(len(df["w_h (m)"])):
+Length_las = np.zeros(len(df["w_h (m)"]))                                                   # Initialise laser length array
+Length_las_sig = np.zeros(len(df["w_h (m)"]))                                               # Initialise laser length sigs
+Length = np.zeros(len(df["w_h (m)"]))                                                       # Initialise length array
+Length_sig = np.zeros(len(df["w_h (m)"]))                                                   # Initialise length sigs
+for i in range(len(df["w_h (m)"])):                                                         # Use previous symbolic function to calculate length
     Length_las[i], Length_las_sig[i] = length_addition(df["Len_las (m)"][i], df["Len_las_sig (m)"][i], df["w_h (m)"][i], df["w_h_sig (m)"][i])
     Length[i], Length_sig[i] = length_addition(df["Len (m)"][i], df["Len_sig (m)"][i], df["w_h (m)"][i], df["w_h_sig (m)"][i])
 
