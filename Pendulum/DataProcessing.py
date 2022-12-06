@@ -3,7 +3,6 @@ import sympy
 from sympy import *
 import numpy as np
 import pandas as pd
-import sys
 
 # Define functions used in the data processing: ------------------------------------------------------------------------------------------------
 
@@ -51,15 +50,29 @@ def period_Pendulum(val_prev, val_prev_sig, val_now, val_now_sig):              
     return vT, vdT
 
 
-def length_addition(Length, Length_sig, Weight_length, Weight_length_sig):              # Assuming the period and length are uncorrelated
+def length_addition(x_val, x_val_sig, y_val, y_val_sig):              # Assuming the period and length are uncorrelated
     x, y = symbols("x, y")                                                              # Assigning symbolic nature to variables
     dx, dy = symbols("sigma_x, sigma_y")                                                # Assigning symbolic nature to variables
     L = x + (1/2)*y                                                                     # Rope + 1/2 weight, since center of mass
     dL = sqrt((L.diff(x)*dx)**2 + (L.diff(y)*dy)**2)                                    # The function for the error propagation
     fL = lambdify((x,y), L)                                                             # Make it a numerical function
     fdL = lambdify((x, dx, y, dy), dL)                                                  # Make it a numerical function
-    vLength, vdLength = Length, Length_sig                                              # Insert values for first parameter
-    vWeight_length, vdWeight_length = Weight_length, Weight_length_sig                  # Insert values for second parameter
+    vLength, vdLength = x_val, x_val_sig                                              # Insert values for first parameter
+    vWeight_length, vdWeight_length = y_val, y_val_sig                  # Insert values for second parameter
+    vL = fL(vLength, vWeight_length)                                                    # Calculate the numerical function
+    vdL = fdL(vLength, vdLength, vWeight_length, vdWeight_length)                       # Calculate the numerical function of the uncertainty
+    #print("The calculated length with propagated errors is: " f"{vL:.2f}", "+-", f"{vdL:.2f}")
+    return vL, vdL
+
+def addition(x_val, x_val_sig, y_val, y_val_sig):              # Assuming the period and length are uncorrelated
+    x, y = symbols("x, y")                                                              # Assigning symbolic nature to variables
+    dx, dy = symbols("sigma_x, sigma_y")                                                # Assigning symbolic nature to variables
+    L = (x + y)/2                                                                     # Slightly uncertain about how to handle this
+    dL = sqrt((L.diff(x)*dx)**2 + (L.diff(y)*dy)**2)                                    # The function for the error propagation
+    fL = lambdify((x,y), L)                                                             # Make it a numerical function
+    fdL = lambdify((x, dx, y, dy), dL)                                                  # Make it a numerical function
+    vLength, vdLength = x_val, x_val_sig                                              # Insert values for first parameter
+    vWeight_length, vdWeight_length = y_val, y_val_sig                  # Insert values for second parameter
     vL = fL(vLength, vWeight_length)                                                    # Calculate the numerical function
     vdL = fdL(vLength, vdLength, vWeight_length, vdWeight_length)                       # Calculate the numerical function of the uncertainty
     #print("The calculated length with propagated errors is: " f"{vL:.2f}", "+-", f"{vdL:.2f}")
@@ -78,21 +91,28 @@ def g_Pendulum(T, T_sig, L, L_sig):                                 # Assuming t
     vT, vdT = T, T_sig                                              # Insert values for second parameter
     vg = fg(vL, vT)                                                 # Calculate the numerical function
     vdg = fdg(vL, vdL, vT, vdT)                                     # Calculate the numerical function of the uncertainty
-    print("The calculated gravitional velocity with propagated errors is: " f"{vg:.2f}", "+-", f"{vdg:.2f} using {L:.2f} as the length")
+    print("The calculated gravitional acceleration with propagated errors is: " f"{vg:.2f}", "+-", f"{vdg:.2f} using {L:.2f} as the length")
     return vg, vdg
 
 # Start working on the data-processing of the timers of the pendulum
 
 # Set data paths
 
-path_to_timer_dat = str(os.getcwd() + r"/alex_output_1.dat")
+path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
+path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
 path_to_data = str(os.getcwd() + r"/PendulumData.csv")
 path_to_T_raw_sig = str(os.getcwd() + r"/T_raw_sig.csv")
 
-file = np.loadtxt(path_to_timer_dat)                                                        # Load the .dat file
-array_of_times = np.zeros(len(file))                                                        # Set a clean numpy array to load the data into
-for i in range(len(file)):                                                                  # Iterate through the .dat file
-    array_of_times[i] = float(list(str(file[i][:]).split(".   ", 1))[1].split("]")[0])      # This handles the weird format into clean floats
+file_alex = np.loadtxt(path_to_timer_dat_alex)                                                    # Load the .dat file
+array_of_times_alex = np.zeros(len(file_alex))                                                    # Set a clean numpy array to load the data into
+for i in range(len(file_alex)):                                                                   # Iterate through the .dat file
+    array_of_times_alex[i] = float(list(str(file_alex[i][:]).split(".   ", 1))[1].split("]")[0])  # This handles the weird format into clean floats
+
+file_arnulf = np.loadtxt(path_to_timer_dat_arnulf)                                                    # Load the .dat file
+array_of_times_arnulf = np.zeros(len(file_arnulf))                                                    # Set a clean numpy array to load the data into
+for i in range(len(file_arnulf)):                                                                   # Iterate through the .dat file
+    array_of_times_arnulf[i] = float(list(str(file_arnulf[i][:]).split(".   ", 1))[1].split("]")[0])  # This handles the weird format into clean floats
+
 
 df = pd.read_csv(path_to_data) 
 df_T_raw_sig = pd.read_csv(path_to_T_raw_sig)                                                             # Pandas to read the .csv file.
@@ -102,10 +122,24 @@ df_T_raw_sig = pd.read_csv(path_to_T_raw_sig)                                   
 
 T_raw_sig = df_T_raw_sig["T_raw_sig (s)"].tolist()                                                    # Pandas read sigs from data file
 
-T = np.zeros(len(array_of_times) - 1)                                                       # Initialise period array
-T_sig = np.zeros(len(array_of_times) - 1)                                                   # Initialise period_sig array
-for i in range(1, len(array_of_times)):                                                     # Iterate to calculate T and T_sig, using previous function
-    T[i - 1], T_sig[i - 1] = period_Pendulum(array_of_times[i - 1], T_raw_sig[i-1], array_of_times[i], T_raw_sig[i])
+array_of_times = np.zeros(len(array_of_times_alex))
+array_of_times_sig = np.zeros(len(array_of_times_alex))
+
+T_alex = np.zeros(len(array_of_times_alex) - 1)                                                       # Initialise period array
+T_alex_sig = np.zeros(len(array_of_times_alex) - 1)                                                   # Initialise period_sig array
+for i in range(1, len(array_of_times_alex)):                                                     # Iterate to calculate T and T_sig, using previous function
+    T_alex[i - 1], T_alex_sig[i - 1] = period_Pendulum(array_of_times_alex[i - 1], T_raw_sig[i-1], array_of_times_alex[i], T_raw_sig[i])
+
+T_arnulf = np.zeros(len(array_of_times_arnulf) - 1)                                                       # Initialise period array
+T_arnulf_sig = np.zeros(len(array_of_times_arnulf) - 1)                                                   # Initialise period_sig array
+for i in range(1, len(array_of_times_arnulf)):                                                     # Iterate to calculate T and T_sig, using previous function
+    T_arnulf[i - 1], T_arnulf_sig[i - 1] = period_Pendulum(array_of_times_arnulf[i - 1], T_raw_sig[i-1], array_of_times_arnulf[i], T_raw_sig[i])
+
+
+T = np.zeros(len(T_alex))
+T_sig = np.zeros(len(T_alex))
+for i in range(len(T_alex)):
+    T[i], T_sig[i] = addition(T_alex[i], T_alex_sig[i], T_arnulf[i], T_arnulf_sig[i])
 
 Length_las = np.zeros(len(df["w_h (m)"]))                                                   # Initialise laser length array
 Length_las_sig = np.zeros(len(df["w_h (m)"]))                                               # Initialise laser length sigs
@@ -114,7 +148,6 @@ Length_sig = np.zeros(len(df["w_h (m)"]))                                       
 for i in range(len(df["w_h (m)"])):                                                         # Use previous symbolic function to calculate length
     Length_las[i], Length_las_sig[i] = length_addition(df["Len_las (m)"][i], df["Len_las_sig (m)"][i], df["w_h (m)"][i], df["w_h_sig (m)"][i])
     Length[i], Length_sig[i] = length_addition(df["Len (m)"][i], df["Len_sig (m)"][i], df["w_h (m)"][i], df["w_h_sig (m)"][i])
-
 
 T_mean, T_sig_mean = weighted_error_prop_mean(T, T_sig, "period")                                    # Combine values to get weighted mean and error prop of T
 L_las_mean, L_las_mean_sig = weighted_error_prop_mean(Length_las, Length_las_sig, "L_laser")
