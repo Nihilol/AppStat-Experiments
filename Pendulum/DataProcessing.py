@@ -3,7 +3,7 @@ import sympy
 from sympy import *
 import numpy as np
 import pandas as pd
-
+import matplotlib.pyplot as plt
 # Define functions used in the data processing: ------------------------------------------------------------------------------------------------
 
 # Define a function for weighted error propagation using dataframe columns
@@ -97,7 +97,68 @@ def g_Pendulum(T, T_sig, L, L_sig):                                 # Assuming t
 # Start working on the data-processing of the timers of the pendulum
 
 # Set data paths
+# %% Calculate periods
+def load_times():
 
+    # Generate a list of .dat files
+    data_files = []
+    files = os.listdir(os.getcwd())
+    for file in files:
+        if file[-3:] == 'dat':
+            data_files.append(file)
+
+    # Load files into dataframe
+    df = pd.DataFrame(columns=['Period', 'Time', 'Filename'])
+    df_t = df.copy()
+    for file in data_files:
+        df_t = pd.DataFrame(columns=['Period', 'Time', 'Filename'])
+
+        # Load data from file
+        arr = np.loadtxt(file)
+        df_t[['Period', 'Time']] = arr
+        df_t['Filename'] = file
+
+        # Save into dataframe
+        if len(df) == 0:
+            df = df_t.copy()
+        else:
+            df = df.append(df_t, ignore_index=True).reset_index(drop=True)
+    return df
+
+df = load_times()
+
+# %% Sanity checks
+files = df['Filename'].unique()
+plt.close('all')
+fig, axes = plt.subplots(2)
+for i in range(len(files)):
+    file = files[i]
+    ind = df['Filename'] == file
+    
+    x = df.loc[ind, 'Period'].values
+    y = df.loc[ind, 'Time'].values
+    
+
+    axes[0].scatter(df.loc[ind, 'Period'].values,
+               df.loc[ind, 'Time'].values,
+               label=file)
+    
+    # Fit 2nd degree polynomial
+    p = np.polyfit(x, y, 2)
+    axes[0].plot(x, np.polyval(p, x))
+
+    # Calculate errors - Should it be squared?
+    yerr = (y - np.polyval(p, x))
+    
+    df.loc[ind, 'Residuals'] = yerr
+
+    axes[1].scatter(x, yerr)
+axes[0].legend()
+
+# Drop
+
+
+# %%
 path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
 path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
 path_to_data = str(os.getcwd() + r"/PendulumData.csv")
