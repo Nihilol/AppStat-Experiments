@@ -29,7 +29,7 @@ def weighted_error_prop_mean(var_list, sig_list, name):                         
     for i in range(len(var_list)):                                               # Weighted mean: equation from slide 16 of "Mean and Width"
         mean += (var_list[i]/(sig_list[i]**2)) / inverse_sigsum_sq
     uncert = np.sqrt(1/inverse_sigsum_sq)                                        # Uncertainty from slide 16 of "Mean and Width"
-    print("The mean of the", name, "is: ", f"{mean:.2f}", " and the uncertainty is: +-", f"{uncert:.2f}")
+    print("The mean of the", name, "is: ", f"{mean:.2f}", " and the uncertainty is: +-", f"{uncert:.6f}")
     return mean, uncert
 
 
