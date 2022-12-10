@@ -151,6 +151,8 @@ plt.close('all')
 fig, axes = plt.subplots(1, 3, figsize=[14, 7.2/2], sharex=True, sharey=True)
 size = 5
 
+
+
 names = ['Alexander', 'Klas', 'Arnulf']
 for i in range(len(files)):
     print('-'*10)
@@ -180,7 +182,6 @@ for i in range(len(files)):
     p = minuit_pendelum.values[:]
 
     print(names[i], p)
-    print(p)
     # Calculate errors - Should it be squared?
     yerr = (y - poly_1_deg(x, *p))
 
@@ -219,7 +220,7 @@ for i in range(len(files)):
     add_text_to_ax(0.02, 0.97, text, ax, fontsize=8);
 
     # Make everything look nice
-    ax.set_ylim([-30, 300])
+    ax.set_ylim([-30, 300])                                         # Is there a way to set the y_lim to be relative to the looped over value?
     yticks = np.linspace(-0.3, 0.3, 5)
     axt.set_ylim(np.array(ax.get_ylim())/100)
     axt.set_yticks(yticks)
@@ -255,11 +256,14 @@ for i in range(len(files)):
     slope = minuit_pendelum.values['slope']
     slope_error = minuit_pendelum.errors['slope']
 
-    L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
+    #L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
 
-    print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
+    #print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
+
 
 fig.subplots_adjust(top=0.9, right=0.9, left=0.15)
+
+plt.show()
 # %%
 path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
 path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
@@ -323,4 +327,4 @@ g = g_Pendulum(T_mean, T_sig_mean, L_mean, L_mean_sig)
 # %%
 # Assuming the period and length are uncorrelated
 
-g_Pendulum(T, T_sig, L, L_sig)
+#g_Pendulum(T, T_sig, L_mean, L_mean_sig)
