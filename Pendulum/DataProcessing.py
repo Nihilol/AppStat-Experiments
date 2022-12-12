@@ -148,7 +148,7 @@ markers = ['x', '^', 'v']
 markers = ['o']*3
 files = df['Filename'].unique()
 plt.close('all')
-fig, axes = plt.subplots(1, 3, figsize=[14, 7.2/2], sharex=True, sharey=True)
+fig, axes = plt.subplots(1, 3, figsize=[8, 7.2/2], sharex=True, sharey=True)
 size = 5
 
 names = ['Alexander', 'Klas', 'Arnulf']
@@ -215,7 +215,7 @@ for i in range(len(files)):
     
     
     text = nice_string_output(d, extra_spacing=2, decimals=3)
-    ax.text(21, 50, text, fontsize='x-small', ha='left')
+    ax.text(18, 50, text, fontsize='xx-small', ha='left')
 
     # Make everything look nice
     ax.set_ylim([-30, 365])
@@ -299,8 +299,8 @@ for i in range(len(files)):
     slope = minuit_pendelum.values['slope']
     slope_error = minuit_pendelum.errors['slope']
 
-fig.subplots_adjust(top=0.9, right=0.9, left=0.15, wspace=0.05)
-# fig.savefig('Pendelum.png', dpi=300)
+fig.subplots_adjust(top=0.9, right=0.95, left=0.06, wspace=0.05)
+fig.savefig('Pendelum.png', dpi=300)
 # %%
 path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
 path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
