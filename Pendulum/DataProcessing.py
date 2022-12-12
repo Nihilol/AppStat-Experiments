@@ -156,7 +156,7 @@ for i in range(len(files)):
     print('-'*10)
     ax = axes[i]
     axt = plt.twinx(ax)
-    axins = ax.inset_axes([20, 50, 16, 100], transform=ax.transData)
+    axins = ax.inset_axes([0, 0.75, 0.5, 0.25], transform=ax.transAxes)
     ax.set_title(names[i])
     file = files[i]
     ind = df['Filename'] == file
@@ -168,11 +168,6 @@ for i in range(len(files)):
     # First we do a least square fit
     p = np.polyfit(x, y, 1)
     errors = np.std(y - np.polyval(p, x))
-
-    # Remove dead time before start point
-    # x = x - np.min(x)
-    # y = y - np.min(y)
-
 
     chi2_object = Chi2Regression(poly_1_deg, x, y, np.ones(len(x))*errors)
     minuit_pendelum = Minuit(chi2_object, slope=8.0, offset=0)
@@ -203,20 +198,7 @@ for i in range(len(files)):
     ax.plot(x, poly_1_deg(x, *p), 'r-')
     hist, bins = np.histogram(yerr, bins=np.linspace(-0.3, 0.3, 13))
     bin_centers = bins[:-1] + np.mean(np.diff(bins))/2
-    axins.errorbar(bin_centers, hist, yerr=hist/np.sqrt(hist),
-                   xerr=np.diff(bins)[-1], ls='', lw=0.5)
-
-    # Fit Gaussian
-    def gaussian(x, a, mu, sigma):
-        return a*np.exp(-((x - mu)/sigma)**2)
-
-    chi2_object_errors = Chi2Regression(gaussian, bin_centers, hist, hist/np.sqrt(hist))
-    minuit_error_fit = Minuit(chi2_object_errors , a=15, mu=0, sigma=0.1)
-    minuit_error_fit.errordef = 1.0   # Chi2 fit
-    minuit_error_fit.migrad();
-    p = minuit_error_fit.values[:]
-    axins.plot(np.linspace(-0.3, 0.3, 100), gaussian(np.linspace(-0.3, 0.3, 100), *p))
-
+        
     # Get the ChiSquare probability:
     chi2_lin = minuit_pendelum.fval
     ndof_lin = len(x) - len(minuit_pendelum.values[:])
@@ -230,11 +212,12 @@ for i in range(len(files)):
          'offset': [minuit_pendelum.values['offset'], minuit_pendelum.errors['offset']],
         }
     
+    
+    
     text = nice_string_output(d, extra_spacing=2, decimals=3)
-    add_text_to_ax(0.02, 0.97, text, ax, fontsize=8);
+    ax.text(21, 50, text, fontsize='x-small', ha='left')
 
     # Make everything look nice
-    # ax.set_ylim([-30, 1.1*y[-1]])
     ax.set_ylim([-30, 365])
     yticks = np.linspace(-0.3, 0.3, 5)
     axt.set_ylim(np.array(ax.get_ylim())/100)
@@ -243,13 +226,47 @@ for i in range(len(files)):
     
     ax.set_xlim(x[0]-1, x[-1]+1)
     
+
+
     # Standard deviation of residuals
     std_err = np.std(Ye)
     axt.plot(ax.get_xlim(), [std_err, std_err], c='grey', ls=':')
     axt.plot(ax.get_xlim(), [-std_err, -std_err], c='grey', ls=':')
-    axt.set_yticklabels(np.round(yticks, 2), size='x-small',
-                        color='blue')  # ????
+
+    # Draw histogram inset
+
+    axins.errorbar(bin_centers, hist, yerr=hist/np.sqrt(hist),
+                   xerr=np.diff(bins)[-1], ls='', lw=0.5)
     
+    axins.set_ylim([0, 25])
+    axins.set_xlim([-0.3, 0.3])
+
+    # Fit Gaussian
+    def gaussian(x, a, mu, sigma):
+        return a*np.exp(-((x - mu)/sigma)**2)
+
+    chi2_object_errors = Chi2Regression(gaussian, bin_centers, hist, hist/np.sqrt(hist))
+    minuit_error_fit = Minuit(chi2_object_errors , a=15, mu=0, sigma=0.1)
+    minuit_error_fit.errordef = 1.0   # Chi2 fit
+    minuit_error_fit.migrad();
+    p = minuit_error_fit.values[:]
+    axins.plot(np.linspace(-0.3, 0.3, 100), gaussian(np.linspace(-0.3, 0.3, 100), *p))
+   
+    axins.set_ylabel('Frequency (#)', size='x-small', loc='bottom')
+    axins.set_xlabel('Time residuals (s)', size='x-small', loc='right')
+
+    axins.yaxis.set_label_position('right')
+
+    axins.set_yticks([0, 10, 20])
+    axins.set_yticklabels([0, 10, 20], fontsize='x-small')
+
+    # Small size
+    for tick in axins.xaxis.get_major_ticks():
+        tick.label.set_fontsize('x-small')
+
+    axins.yaxis.set_ticks_position('right')
+
+
     # Small size
     for tick in ax.yaxis.get_major_ticks():
         tick.label.set_fontsize('small')
@@ -258,25 +275,32 @@ for i in range(len(files)):
     for tick in ax.xaxis.get_major_ticks():
         tick.label.set_fontsize('small')
     
-    ax.text(1.08, 0.25, 'Dashed lines show ' + r'$\pm 1\sigma$', rotation=90,
-            size='xx-small', transform=ax.transAxes, va='bottom')
-    # Labels
-    ax.set_ylabel('Time (s)', size='small', labelpad=0.5)
-    ax.set_xlabel('Measurement(#)', size='small', labelpad=0.5)
-    axt.set_ylabel('Time residuals (s)                   ', size='small',
-                   loc='center', labelpad=-20, color='blue')
 
+
+    # Labels
+    if i ==0:
+        ax.set_ylabel('Time (s)', size='small', labelpad=0.5)
+    ax.set_xlabel('Measurement(#)', size='small', labelpad=0.5)
+
+    if i == 2:
+        axt.set_ylabel('Time residuals (s)                   ', size='small',
+                       loc='center', labelpad=-20, color='blue')
+        ax.text(1.08, 0.25, 'Dashed lines show ' + r'$\pm 1\sigma$', rotation=90,
+                size='xx-small', transform=ax.transAxes, va='bottom')
+
+        axt.set_yticklabels(np.round(yticks, 2), size='x-small',
+                            color='blue')  # ????
+    else:
+        axt.set_yticklabels([], size='x-small',
+                            color='blue')  # ????
+        
 
     # Actually quantify the period
     slope = minuit_pendelum.values['slope']
     slope_error = minuit_pendelum.errors['slope']
 
-    # L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
-
-    # print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
-
-fig.subplots_adjust(top=0.9, right=0.9, left=0.15)
-fig.savefig('Pendelum.png', dpi=300)
+fig.subplots_adjust(top=0.9, right=0.9, left=0.15, wspace=0.05)
+# fig.savefig('Pendelum.png', dpi=300)
 # %%
 path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
 path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
