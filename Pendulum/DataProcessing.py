@@ -161,6 +161,7 @@ for i in range(len(files)):
     print('-'*10)
     ax = axes[i]
     axt = plt.twinx(ax)
+    axins = ax.inset_axes([20, 50, 16, 100], transform=ax.transData)
     ax.set_title(names[i])
     file = files[i]
     ind = df['Filename'] == file
@@ -204,8 +205,22 @@ for i in range(len(files)):
     ax.errorbar(x, y, yerr=yerr, ls='', marker='o', ms=4)
     axt.errorbar(x, yerr, yerr=np.std(yerr), marker=markers[i], ms=2, ls='')
     ax.plot(x, poly_1_deg(x, *p), 'r-')
+    hist, bins = np.histogram(yerr, bins=np.linspace(-0.3, 0.3, 13))
+    bin_centers = bins[:-1] + np.mean(np.diff(bins))/2
+    axins.errorbar(bin_centers, hist, yerr=hist/np.sqrt(hist),
+                   xerr=np.diff(bins)[-1], ls='', lw=0.5)
 
-    
+    # Fit Gaussian
+    def gaussian(x, a, mu, sigma):
+        return a*np.exp(-((x - mu)/sigma)**2)
+
+    chi2_object_errors = Chi2Regression(gaussian, bin_centers, hist, hist/np.sqrt(hist))
+    minuit_error_fit = Minuit(chi2_object_errors , a=15, mu=0, sigma=0.1)
+    minuit_error_fit.errordef = 1.0   # Chi2 fit
+    minuit_error_fit.migrad();
+    p = minuit_error_fit.values[:]
+    axins.plot(np.linspace(-0.3, 0.3, 100), gaussian(np.linspace(-0.3, 0.3, 100), *p))
+
     # Get the ChiSquare probability:
     chi2_lin = minuit_pendelum.fval
     ndof_lin = len(x) - len(minuit_pendelum.values[:])
@@ -223,7 +238,12 @@ for i in range(len(files)):
     add_text_to_ax(0.02, 0.97, text, ax, fontsize=8);
 
     # Make everything look nice
+<<<<<<< HEAD
     ax.set_ylim([-30, y[-1]])                                         # Is there a way to set the y_lim to be relative to the looped over value?
+=======
+    # ax.set_ylim([-30, 1.1*y[-1]])
+    ax.set_ylim([-30, 365])
+>>>>>>> refs/remotes/origin/main
     yticks = np.linspace(-0.3, 0.3, 5)
     axt.set_ylim(np.array(ax.get_ylim())/100)
     axt.set_yticks(yticks)
@@ -261,6 +281,7 @@ for i in range(len(files)):
     slope_data[i] = minuit_pendelum.values['slope']
     slope_data_uncert[i] = minuit_pendelum.errors['slope']
 
+<<<<<<< HEAD
     #L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
 
     #print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
@@ -271,6 +292,14 @@ slope_pendulum, slope_pendulum_uncert = weighted_error_prop_mean(slope_data, slo
 fig.subplots_adjust(top=0.9, right=0.9, left=0.15)
 
 plt.show()
+=======
+    # L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
+
+    # print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
+
+fig.subplots_adjust(top=0.9, right=0.9, left=0.15)
+fig.savefig('Pendelum.png', dpi=300)
+>>>>>>> refs/remotes/origin/main
 # %%
 path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
 path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
