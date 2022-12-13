@@ -170,7 +170,7 @@ for i in range(len(files)):
     y = df.loc[ind, 'Time'].values
 
 
-    # First we do a least square fit
+    # First we do a least square fitsdxfsdddfdcxsdffjdcxsvghlkcxsfd
     p = np.polyfit(x, y, 1)
     errors = np.std(y - np.polyval(p, x))
 
@@ -238,12 +238,11 @@ for i in range(len(files)):
     add_text_to_ax(0.02, 0.97, text, ax, fontsize=8);
 
     # Make everything look nice
-<<<<<<< HEAD
+
     ax.set_ylim([-30, y[-1]])                                         # Is there a way to set the y_lim to be relative to the looped over value?
-=======
+
     # ax.set_ylim([-30, 1.1*y[-1]])
     ax.set_ylim([-30, 365])
->>>>>>> refs/remotes/origin/main
     yticks = np.linspace(-0.3, 0.3, 5)
     axt.set_ylim(np.array(ax.get_ylim())/100)
     axt.set_yticks(yticks)
@@ -281,25 +280,49 @@ for i in range(len(files)):
     slope_data[i] = minuit_pendelum.values['slope']
     slope_data_uncert[i] = minuit_pendelum.errors['slope']
 
-<<<<<<< HEAD
+
     #L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
 
     #print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
 
 slope_pendulum, slope_pendulum_uncert = weighted_error_prop_mean(slope_data, slope_data_uncert, "slope")
 
+# Calculate chi2 for pendulim periods -----------------------------------------------------------------------------------------------------------
+
+def poly_1(offset):
+    return offset
+
+def ChiSquareLinear(offset):
+    Linear_est = poly_1(offset)
+    chi2 = np.sum(((slope_data - Linear_est) / slope_data_uncert) ** 2)
+    return chi2
+
+
+minuit_lin = Minuit(ChiSquareLinear, offset = slope_pendulum)
+minuit_lin.errordef = 1.0
+minuit_lin.migrad();
+
+if (not minuit_lin.fmin.is_valid):
+    print("  WARNING: The ChiSquare fit DID NOT converge!!! ")
+
+for name in minuit_lin.parameters:
+    print("Fit value (exp): {0} = {1:.5f} +/- {2:.5f}".format(name, minuit_lin.values[name], minuit_lin.errors[name]))
+chi2_lin = minuit_lin.fmin.fval
+Ndof_lin = len(slope_data) - len(minuit_lin.values[:])
+Prob_lin = stats.chi2.sf(chi2_lin, Ndof_lin)
+print(f"  Model fit:  Prob(Chi2={chi2_lin:6.1f}, Ndof={Ndof_lin:3d}) = {Prob_lin:7.5f}")
+
+
 
 fig.subplots_adjust(top=0.9, right=0.9, left=0.15)
 
 plt.show()
-=======
     # L_mean, L_mean_sig = weighted_error_prop_mean(Length, Length_sig, "L")
 
     # print('Gravity:', g_Pendulum(slope, slope_error, L_mean, L_mean_sig))
 
 fig.subplots_adjust(top=0.9, right=0.9, left=0.15)
 fig.savefig('Pendelum.png', dpi=300)
->>>>>>> refs/remotes/origin/main
 # %%
 path_to_timer_dat_arnulf = str(os.getcwd() + r"/periodmeasure2_arnulf.dat")
 path_to_timer_dat_alex = str(os.getcwd() + r"/alex_output_1.dat")
@@ -359,6 +382,76 @@ g_las = g_Pendulum(T_mean, T_sig_mean, L_las_mean, L_las_mean_sig)
 g = g_Pendulum(T_mean, T_sig_mean, L_mean, L_mean_sig)
 #print("The value of the gravitional acceleration, with no error propagation, is: "f"{g:.3f}")
 
+
+
+# Calculate chi2 for the length of the pendulum ------------------------------------------------------------------------------------------------
+
+def poly_1_len(offset):
+    return offset
+
+def ChiSquareLinear_Len(offset):
+    Linear_est = poly_1_len(offset)
+    chi2 = np.sum(((df["Len_las (m)"].values - Linear_est) / df["Len_las_sig (m)"].values) ** 2)
+    return chi2
+
+
+
+minuit_lin_len = Minuit(ChiSquareLinear_Len, offset = L_las_mean)
+minuit_lin_len.errordef = 1.0
+minuit_lin_len.migrad();
+
+if (not minuit_lin_len.fmin.is_valid):
+    print("  WARNING: The ChiSquare fit DID NOT converge!!! ")
+
+for name in minuit_lin_len.parameters:
+    print("Fit value (exp): {0} = {1:.5f} +/- {2:.5f}".format(name, minuit_lin_len.values[name], minuit_lin_len.errors[name]))
+chi2_lin_len = minuit_lin_len.fmin.fval
+Ndof_lin_len = len(df["Len_las (m)"].values) - len(minuit_lin_len.values[:])
+Prob_lin_len = stats.chi2.sf(chi2_lin_len, Ndof_lin_len)
+print(f"  Model fit:  Prob(Chi2={chi2_lin_len:6.1f}, Ndof={Ndof_lin_len:3d}) = {Prob_lin_len:7.5f}")
+
+x_slope = [1, 2, 3]
+
+fig2, axe2 = plt.subplots(1, 2, figsize=[14, 7.2/2])
+
+axe2[0].errorbar(x_slope, slope_data, yerr=slope_data_uncert, ls='', marker='o', ms=4, label = "Raw data")
+axe2[0].hlines(poly_1(minuit_lin.values['offset']), color = 'r', linestyle = '-.', xmin = x_slope[0], xmax = x_slope[2], label = "Fitted data")
+axe2[0].set_title("Weighted means of periods")
+axe2[0].set_ylabel("Period length (s)")
+axe2[0].set_xlabel("# of data collection")
+
+d_lin = {'Chi2': chi2_lin,
+    'Ndof': Ndof_lin,
+    'Prob': Prob_lin,
+    'Fitted Mean': [minuit_lin.values['offset'], minuit_lin.errors['offset']]}
+
+axe2[0].grid()
+axe2[0].legend(loc = "upper left")
+text_len = nice_string_output(d_lin, extra_spacing=2, decimals=3)
+add_text_to_ax(0.47, 0.35, text_len, axe2[0], fontsize=10);
+
+
+x_slope_len = [1, 2, 3, 4]
+
+d_len = {'Chi2': chi2_lin_len,
+    'Ndof': Ndof_lin_len,
+    'Prob': Prob_lin_len,
+    'Fitted Mean': [minuit_lin_len.values['offset'], minuit_lin_len.errors['offset']]}
+
+axe2[1].errorbar(x_slope_len, df["Len_las (m)"].values, yerr=df["Len_las_sig (m)"].values, ls='', marker='o', ms=4, label = "Raw data")
+axe2[1].hlines(poly_1(minuit_lin_len.values['offset']), color = 'r', linestyle = '-.', xmin = x_slope_len[0], xmax = x_slope_len[3], label = "Mean")
+axe2[1].grid()
+axe2[1].legend(loc = "upper left")
+axe2[1].set_title("Length data")
+axe2[1].set_ylabel("Length (m)")
+axe2[1].set_xlabel("# of data collection")
+
+text_len = nice_string_output(d_len, extra_spacing=2, decimals=3)
+add_text_to_ax(0.45, 0.35, text_len, axe2[1], fontsize=10);
+
+plt.show()
+
+fig2.savefig('T_and_L.png', dpi=300)
 
 # %%
 # Assuming the period and length are uncorrelated
