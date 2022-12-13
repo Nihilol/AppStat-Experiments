@@ -74,9 +74,7 @@ def gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig,
 
     g = (a/sympy.sin(theta))*(1 + (2/5)*((Dball**2)/(Dball**2 - Drail**2)))
 
-    dg0 = (g.diff(a)**2)*da**2 + (g.diff(theta)**2)*dtheta**2    
-    dg1 = sqrt((g.diff(Dball)**2)*dDball**2 + (g.diff(Drail)**2)*dDrail**2)
-    dg = dg0 + dg1
+    dg = sqrt((g.diff(a)**2)*da**2 + (g.diff(theta)**2)*dtheta**2 + (g.diff(Dball)**2)*dDball**2 + (g.diff(Drail)**2)*dDrail**2)
 
     # Convert to numerical functions
     fg = lambdify((a, theta, Dball, Drail), g) 
@@ -91,8 +89,26 @@ def gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig,
     vdg = fdg(va, vtheta, vDball, vDrail, a_sig, theta_sig, Dball_sig, Drail_sig)
     
     return vg, vdg
-    
-    
+
+
+def error_contribution(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig, Drail_sig):
+    a, theta, Dball, Drail = symbols("a, theta, Dball, Drail")
+    da, dtheta, dDball, dDrail = symbols("sigma_a, sigma_theta, sigma_Dball, sigma_Drail")
+
+    t0, t1, t2, t3 = symbols("t0, t1, t2, t3")
+    g = (a/sympy.sin(theta))*(1 + (2/5)*((Dball**2)/(Dball**2 - Drail**2)))
+
+    # No square root
+    dg = t0*(g.diff(a)**2)*da**2 + t1*(g.diff(theta)**2)*dtheta**2 + t2*(g.diff(Dball)**2)*dDball**2 + t3*(g.diff(Drail)**2)*dDrail**2
+
+    # Convert to numerical functions
+    fdg = lambdify((a, theta, Dball, Drail, da, dtheta, dDball, dDrail, t0, t1, t2, t3), dg)
+
+    # Assign values
+    va, vtheta, vDball, vDrail = a_num, theta_num, Dball_num, Drail_num
+    da, dtheta, dDball, dDrail  = a_sig, theta_sig, Dball_sig, Drail_sig
+
+    return  fdg(va, vtheta, vDball, vDrail, da, dtheta, dDball, dDrail, 1, 0, 0, 0), fdg(va, vtheta, vDball, vDrail, da, dtheta, dDball, dDrail, 0, 1, 0, 0), fdg(va, vtheta, vDball, vDrail, da, dtheta, dDball, dDrail, 0, 0, 1, 0), fdg(va, vtheta, vDball, vDrail, da, dtheta, dDball, dDrail, 0, 0, 0, 1)
 # %% Gravity
     
 #We load the time data for Big and small spheres into two arrays, as well as two for the reverse cases
@@ -305,9 +321,9 @@ for i in range(2):
     a_num, a_sig = minuit_balls.values['a'], minuit_balls.errors['a']
     theta_num, theta_sig = np.deg2rad(theta_mean), np.deg2rad(theta_uncert)
     if ball_size == 'Small':
-        Dball_num, Dball_sig = r_sball_mean, r_sball_uncert
+        Dball_num, Dball_sig = r_sball_mean/1000, r_sball_uncert/1000
     elif ball_size == 'Big':
-        Dball_num, Dball_sig = r_bball_mean/1000, r_bball_uncert//1000
+        Dball_num, Dball_sig = r_bball_mean/1000, r_bball_uncert/1000
     else:
         raise ValueError
         
@@ -316,6 +332,11 @@ for i in range(2):
     vg, vg_diff = gravity(a_num, theta_num, Dball_num,
                           Drail_num, a_sig, theta_sig,
                           Dball_sig, Drail_sig)
+
+
+    print('Respective error contribution', np.round(error_contribution(a_num, theta_num, Dball_num,
+                          Drail_num, a_sig, theta_sig,
+                          Dball_sig, Drail_sig), 10))
 
     gees.append(vg)
     gees_sigma.append(vg_diff)
@@ -327,7 +348,7 @@ for i in range(2):
     d = {'Chi2': chi2_lin,
          'Ndof': ndof_lin,
          'Prob': chi2_prob_lin}
-    
+    print(chi2_prob_lin)
     d2 = {r'$a$': [minuit_balls.values['a'], minuit_balls.errors['a']],
           r'$v_{0}$': [minuit_balls.values['v0'], minuit_balls.errors['v0']],
           '$d$': [minuit_balls.values['d'], minuit_balls.errors['d']],
@@ -388,8 +409,8 @@ print('g', np.round([gees[1], gees_sigma[1]], 3))
 print('Merged')
 g, g_sigma = weighted_error_prop_mean2(gees, gees_sigma, 'Gravity')
 print('g', np.round([g, g_sigma], 3))
-#print('Respective error contribution',
- #     error_contribution(T_mean, T_sig_mean, L_mean, L_mean_sig))
+
+
 
 # %%
 
