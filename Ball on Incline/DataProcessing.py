@@ -5,8 +5,13 @@ from sympy import *  # And here?
 import numpy as np
 import pandas as pd
 import scipy.signal as ss
+from iminuit import Minuit                             # The actual fitting tool, supposedly better than scipy's
+from scipy.stats import chi2
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
+from ExternalFunctions import Chi2Regression, BinnedLH, UnbinnedLH
+from ExternalFunctions import nice_string_output, add_text_to_ax    # Useful functions to print fit results on figure
+
 
 
 # Define function to calculate the error propagation in collected data using a weighted mean ------------------------------------------------
@@ -62,6 +67,42 @@ def angle(Hyp, Opp, Hyp_uncern, Opp_uncern):                        # Assuming t
 
 theta = angle(Hyp_mean, h_mean, Hyp_uncert, h_uncert)
 
+
+def gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig, Drail_sig):
+    a, theta, Dball, Drail = symbols("a, theta, Dball, Drail")
+    da, dtheta, dDball, dDrail = symbols("sigma_a, sigma_theta, sigma_Dball, sigma_Drail")
+
+    g = (a/sympy.sin(theta))*(1 + (2/5)*((Dball**2)/(Dball**2 - Drail**2)))
+
+    dg0 = (g.diff(a)**2)*da**2 + (g.diff(theta)**2)*dtheta**2    
+    dg1 = (g.diff(Dball)**2)*dDball**2 + (g.diff(Drail)**2)*dDrail**2
+    dg = dg0 + dg1
+
+    # Convert to numerical functions
+    fg = lambdify((a, theta, Dball, Drail), g) 
+    fdg = lambdify((a, theta, Dball, Drail, da, dtheta, dDball, dDrail), dg)
+
+    # Assign values
+    va, vtheta, vDball, vDrail = a_num, theta_num, Dball_num, Drail_num
+    da, dtheta, dDball, dDrail  = a_sig, theta_sig, Dball_sig, Drail_sig
+    
+    # Evaluate numerical functions
+    vg = fg(va, vtheta, vDball, vDrail)
+    vdg = fdg(va, vtheta, vDball, vDrail, a_sig, theta_sig, Dball_sig, Drail_sig)
+    
+    return vg, vdg
+    
+
+def error_prop(function, variables, sigmas):
+    sigma_squared = 0
+    
+    for i in range(len(variables)):
+        var = variables[i]
+        sigma = sigmas[i]
+        sigma_squared += (function.diff(var)**2)*sigmas[i]**2
+    
+# %% Gravity
+    
 #We load the time data for Big and small spheres into two arrays, as well as two for the reverse cases
 
 #Since we have an uneven number of data points, we drop the first data points from each array untill they all have length of the shortest
@@ -154,7 +195,7 @@ for i in range(len(signals)):
 
 df_distances = pd.DataFrame()
 df_distances['Distance'] = np.array([L1_mean, L2_mean, L3_mean, L4_mean, L5_mean])
-df_distances['Sigma'] = np.array([L1_uncert, L2_uncert, L3_uncert, L4_uncert, L5_uncert])
+df_distances['Sigma'] = np.array([L1_uncert, L2_uncert, L3_uncert, L4_uncert, L5_uncert])*2
 
 # %% Plot to investigate acceleration for all measurements
 plt.close('all')
@@ -201,7 +242,7 @@ for i in range(5):
     mean, sigma = weighted_error_prop_mean(df_peaks.loc[ind_small & ind_peak, 'Time'],
                                            df_peaks.loc[ind_small & ind_peak, 'FWHM'])
     
-    df_peak_summary.loc[count, 'Sphere_size'] = 'small'
+    df_peak_summary.loc[count, 'Sphere_size'] = 'Small'
     df_peak_summary.loc[count, 'Peak_no'] = i
     df_peak_summary.loc[count, 'Time_mean'] = mean
     df_peak_summary.loc[count, 'Time_sigma'] = sigma
@@ -220,39 +261,73 @@ for i in range(5):
     df_peak_summary.loc[count, 'Time_sigma'] = sigma
     count += 1
 
+
 # %% Summary plot for X2 fit
+def distance(t, a, v0, d):
+    return (a/2)*t**2 + v0*t + d
+
+
 plt.close('all')
-fig, ax = plt.subplots(1)
+fig, axes = plt.subplots(1, 2, sharex=True, sharey=True)
 
-"""
-TODO!
-    ind = df_peaks['File'] == file
-    df_t = df_peaks.loc[ind, :]
-    
-    if len(df_t) != len(df_distances):
-        print('Spooky stuff going on in file', file)
-        continue
+for i in range(2):
+    ax = axes[i]
+    ball_size = ['Small', 'Big'][i]
 
-    x = df_t['Time'].astype(float).values
-    y = df_distances['Distance'].values
+    ind = df_peak_summary['Sphere_size'] == ball_size
     
-    xe = df_t['FWHM'].astype(float).values
-    ye = df_distances['Sigma'].values
+    x = df_peak_summary.loc[ind, 'Time_mean'].values
+    y = df_distances['Distance'].values/1000
     
-    if 'small'in file:
-        color='blue'
-    else:
-        color='red'
+    xe = df_peak_summary.loc[ind, 'Time_sigma'].values
+    ye = df_distances['Sigma'].values/1000
+    
+    ax.errorbar(x*1000, y*1000, xerr=xe*1000, yerr=ye*1000, lw=2, ls='', marker='',
+                label=ball_size)
 
-    ax.errorbar(x, y, xerr=xe, yerr=ye, lw=1, ls='', marker='', c=color)
+    ax.set_xlabel('Time (ms)')
+    ax.set_ylabel('Distance (mm)')
 
-ax.set_xlabel('Time (s)')
-ax.set_ylabel('Distance (mm)')
-"""
+    # Perform fit
+    chi2_object = Chi2Regression(distance, x, y, ye)
+    minuit_balls = Minuit(chi2_object, a=1, v0=0, d=0)
+    minuit_balls.errordef = 1.0   # Chi2 fit
+    minuit_balls.migrad();
+    p = minuit_balls.values[:]    
+
+    # Get the ChiSquare probability:
+    chi2_lin = minuit_balls.fval
+    ndof_lin = len(x) - len(minuit_balls.values[:])
+    chi2_prob_lin = chi2.sf(chi2_lin, ndof_lin)
+
+    # Include fit results in the plot:
+    d = {'Chi2': chi2_lin,
+         'Ndof': ndof_lin,
+         'Prob': chi2_prob_lin,
+         'Acceleration': [minuit_balls.values['a'], minuit_balls.errors['a']],
+         r'$v_{0}$': [minuit_balls.values['v0'], minuit_balls.errors['v0']],
+         'Distance offset': [minuit_balls.values['d'], minuit_balls.errors['d']],
+        }
     
+    text = nice_string_output(d, extra_spacing=3, decimals=5)
+    ax.text(0, 600, text, fontsize='xx-small', ha='left')
+
+    ax.set_title(ball_size)
+    xv = np.linspace(0, x[-1], 100)
+    ax.plot(xv*1000, distance(xv, *p)*1000)
+
+
+    # Calculate gravity
+    a_num, a_sig = minuit_balls.values['a'], minuit_balls.errors['a']
+    theta_num, theta_sig = np.deg2rad(theta_mean), np.deg2rad(theta_uncert)
+    Dball_num, Dball_sig = r_bball_mean/1000, r_bball_uncert//1000
+#    Dball_num, Dball_sig = r_sball_mean, r_sball_uncert
+    Drail_num, Drail_sig = d_r_mean/1000, d_r_uncert/1000
     
+    vg, vg_diff = gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig, Drail_sig)
+    print(vg, vg_diff )#
+
 # %%
-
 Datlengs=np.zeros(10)
 for i in range(10):
     Lenload=np.genfromtxt(os.getcwd()+"/Balls/Original/big_sphere_%s.csv"%(i+1),delimiter=',',skip_header=15).T  #Skips the header and transposes so first axis is shortest (ie. data along columns)
@@ -313,4 +388,9 @@ def Peaksfromarr(A):                                                            
         redge_time[i,:]=redges
     return redge_time                                                                                            #It feels bad to not give an uncertainty. Technically I guess this should be related to the extension of the slope for the peak sides, but it seems negligible from the plots and will be dominated by other errors regardless.
 
+
+
 #Only thing remaining is to combine the time data with length to fit an a and then combine all into a measure of g
+
+
+# %%
