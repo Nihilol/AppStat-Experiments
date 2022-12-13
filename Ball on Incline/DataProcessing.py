@@ -75,7 +75,7 @@ def gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig,
     g = (a/sympy.sin(theta))*(1 + (2/5)*((Dball**2)/(Dball**2 - Drail**2)))
 
     dg0 = (g.diff(a)**2)*da**2 + (g.diff(theta)**2)*dtheta**2    
-    dg1 = (g.diff(Dball)**2)*dDball**2 + (g.diff(Drail)**2)*dDrail**2
+    dg1 = sqrt((g.diff(Dball)**2)*dDball**2 + (g.diff(Drail)**2)*dDrail**2)
     dg = dg0 + dg1
 
     # Convert to numerical functions
@@ -92,14 +92,6 @@ def gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig,
     
     return vg, vdg
     
-
-def error_prop(function, variables, sigmas):
-    sigma_squared = 0
-    
-    for i in range(len(variables)):
-        var = variables[i]
-        sigma = sigmas[i]
-        sigma_squared += (function.diff(var)**2)*sigmas[i]**2
     
 # %% Gravity
     
@@ -268,8 +260,12 @@ def distance(t, a, v0, d):
 
 
 plt.close('all')
-fig, axes = plt.subplots(1, 2, sharex=True, sharey=True)
+fig, axes = plt.subplots(1, 2, sharex=True, sharey=True, figsize=[7, 3])
 
+accs = []
+accs_sigma = []
+gees = []
+gees_sigma = []
 for i in range(2):
     ax = axes[i]
     ball_size = ['Small', 'Big'][i]
@@ -277,16 +273,17 @@ for i in range(2):
     ind = df_peak_summary['Sphere_size'] == ball_size
     
     x = df_peak_summary.loc[ind, 'Time_mean'].values
-    y = df_distances['Distance'].values/1000
-    
+    y = df_distances['Distance'].values/1000  # Convert to SI
+
     xe = df_peak_summary.loc[ind, 'Time_sigma'].values
     ye = df_distances['Sigma'].values/1000
     
-    ax.errorbar(x*1000, y*1000, xerr=xe*1000, yerr=ye*1000, lw=2, ls='', marker='',
-                label=ball_size)
-
-    ax.set_xlabel('Time (ms)')
-    ax.set_ylabel('Distance (mm)')
+    # Plot in mm and ms
+    error_scaler = 100
+    ax.errorbar(x*1000, y*1000, xerr=xe*1000*error_scaler,
+                yerr=ye*1000*error_scaler,
+                lw=1, ls='', marker='',
+                label='Errors * ' + str(error_scaler))
 
     # Perform fit
     chi2_object = Chi2Regression(distance, x, y, ye)
@@ -300,34 +297,103 @@ for i in range(2):
     ndof_lin = len(x) - len(minuit_balls.values[:])
     chi2_prob_lin = chi2.sf(chi2_lin, ndof_lin)
 
-    # Include fit results in the plot:
-    d = {'Chi2': chi2_lin,
-         'Ndof': ndof_lin,
-         'Prob': chi2_prob_lin,
-         'Acceleration': [minuit_balls.values['a'], minuit_balls.errors['a']],
-         r'$v_{0}$': [minuit_balls.values['v0'], minuit_balls.errors['v0']],
-         'Distance offset': [minuit_balls.values['d'], minuit_balls.errors['d']],
-        }
-    
-    text = nice_string_output(d, extra_spacing=3, decimals=5)
-    ax.text(0, 600, text, fontsize='xx-small', ha='left')
-
-    ax.set_title(ball_size)
+    # Plot fit in correct units
     xv = np.linspace(0, x[-1], 100)
-    ax.plot(xv*1000, distance(xv, *p)*1000)
-
+    ax.plot(xv*1000, distance(xv, *p)*1000, label= r'$\chi^{2}$ fit')
 
     # Calculate gravity
     a_num, a_sig = minuit_balls.values['a'], minuit_balls.errors['a']
     theta_num, theta_sig = np.deg2rad(theta_mean), np.deg2rad(theta_uncert)
-    Dball_num, Dball_sig = r_bball_mean/1000, r_bball_uncert//1000
-#    Dball_num, Dball_sig = r_sball_mean, r_sball_uncert
+    if ball_size == 'Small':
+        Dball_num, Dball_sig = r_sball_mean, r_sball_uncert
+    elif ball_size == 'Big':
+        Dball_num, Dball_sig = r_bball_mean/1000, r_bball_uncert//1000
+    else:
+        raise ValueError
+        
     Drail_num, Drail_sig = d_r_mean/1000, d_r_uncert/1000
     
-    vg, vg_diff = gravity(a_num, theta_num, Dball_num, Drail_num, a_sig, theta_sig, Dball_sig, Drail_sig)
-    print(vg, vg_diff )#
+    vg, vg_diff = gravity(a_num, theta_num, Dball_num,
+                          Drail_num, a_sig, theta_sig,
+                          Dball_sig, Drail_sig)
+
+    gees.append(vg)
+    gees_sigma.append(vg_diff)
+    # Make plot a bit nicer
+    ax.set_title(ball_size + ' spheres', size='medium')
+    ax.set_xlabel('Time (ms)')
+
+    # Annotate plots
+    d = {'Chi2': chi2_lin,
+         'Ndof': ndof_lin,
+         'Prob': chi2_prob_lin}
+    
+    d2 = {r'$a$': [minuit_balls.values['a'], minuit_balls.errors['a']],
+          r'$v_{0}$': [minuit_balls.values['v0'], minuit_balls.errors['v0']],
+          '$d$': [minuit_balls.values['d'], minuit_balls.errors['d']],
+          '$g$': [vg, vg_diff]}
+    
+    text = nice_string_output(d, extra_spacing=3, decimals=2)
+    ax.text(5, 590, text, fontsize='x-small', ha='left', va='top')
+
+    text2 = nice_string_output(d2, extra_spacing=3, decimals=3)
+    ax.text(380, 30, text2, fontsize='x-small', ha='left', va='bottom')
+    ax.set_ylim([0, 750])
+    ax.grid()
+    ax.legend(loc=2, frameon=False, fontsize='x-small')
+    
+    accs.append(minuit_balls.values['a'])
+    accs_sigma.append(minuit_balls.errors['a'])
+        
+fig.subplots_adjust(left=0.1, right=0.98, bottom=0.15, wspace=0.05)
+fig.savefig('Sphere acceleration', dpi=300)
+
+
+
+# %% Collect results
+# Combine values to get weighted mean and error prop of T
+# g = (a/sympy.sin(theta))*(1 + (2/5)*((Dball**2)/(Dball**2 - Drail**2)))
+
+
+
+def weighted_error_prop_mean2(var_list, sig_list, name):
+    mean, inverse_sigsum_sq = 0, 0
+    for j in range(len(sig_list)):
+        inverse_sigsum_sq += (1/(sig_list[j]**2))
+    for i in range(len(var_list)):
+        mean += (var_list[i]/(sig_list[i]**2)) / inverse_sigsum_sq
+    uncert = np.sqrt(1/inverse_sigsum_sq)
+    print("The mean of the", name, "is: ", f"{mean:.2f}", " and the uncertainty is: +-", f"{uncert:.2f}")
+    return mean, uncert
+
+
+theta_mean, theta_uncert = weighted_error_prop_mean(df['theta (degrees)'], df['theta_sig (degrees)'])
+d_r_mean, d_r_uncert = weighted_error_prop_mean(df['d_rail (mm)'], df['d_rail_sig (mm)'])
+
+print('Variables used:')
+print('Inclination', np.round([theta_mean, theta_uncert], 3))
+print('D_rail', np.round([d_r_mean, d_r_uncert], 3))
+
+print('Small balls')
+print('D_ball', np.round([r_sball_mean, r_sball_uncert], 3))
+print('Acceleration', np.round([accs[0], accs_sigma[0]], 3))
+print('g', np.round([gees[0], gees_sigma[0]], 3))
+
+
+print('Large balls')
+print('D_ball', np.round([r_bball_mean, r_bball_uncert], 3))
+print('Acceleration', np.round([accs[1], accs_sigma[1]], 3))
+print('g', np.round([gees[1], gees_sigma[1]], 3))
+
+print('Merged')
+g, g_sigma = weighted_error_prop_mean2(gees, gees_sigma, 'Gravity')
+print('g', np.round([g, g_sigma], 3))
+#print('Respective error contribution',
+ #     error_contribution(T_mean, T_sig_mean, L_mean, L_mean_sig))
 
 # %%
+
+
 Datlengs=np.zeros(10)
 for i in range(10):
     Lenload=np.genfromtxt(os.getcwd()+"/Balls/Original/big_sphere_%s.csv"%(i+1),delimiter=',',skip_header=15).T  #Skips the header and transposes so first axis is shortest (ie. data along columns)

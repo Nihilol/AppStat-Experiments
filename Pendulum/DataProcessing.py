@@ -99,9 +99,27 @@ def g_Pendulum(T, T_sig, L, L_sig):                                 # Assuming t
     print("The calculated gravitional acceleration with propagated errors is: " f"{vg:.2f}", "+-", f"{vdg:.2f} using {L:.2f} as the length")
     return vg, vdg
 
-# Start working on the data-processing of the timers of the pendulum
 
-# Set data paths
+def error_contribution(T, T_sig, L, L_sig):
+    L_sym, T_sym = symbols("l, t")
+    dL, dT = symbols("sigma_L, sigma_T")
+
+    term0, term1 = symbols("t0, t1")
+
+    g = L_sym*(2*np.pi/T_sym)**2
+    dg = term0*(g.diff(L_sym)*dL)**2 + term1*(g.diff(T_sym)*dT)**2
+    
+    # Lambdify
+    fdg = lambdify((L_sym, dL, T_sym, dT, term0, term1), dg)
+
+    # Evaluate
+    vL, vdL = L, L_sig
+    vT, vdT = T, T_sig
+
+    t0, t1 = 1, 0
+
+    return fdg(vL, vdL, vT, vdT, t0, t1), fdg(vL, vdL, vT, vdT, t1, t0) # L, T
+
 # %% Calculate periods
 def load_times():
 
@@ -152,6 +170,8 @@ fig, axes = plt.subplots(1, 3, figsize=[8, 7.2/2], sharex=True, sharey=True)
 size = 5
 
 names = ['Alexander', 'Klas', 'Arnulf']
+slopes = []
+slope_errors = []
 for i in range(len(files)):
     print('-'*10)
     ax = axes[i]
@@ -296,8 +316,8 @@ for i in range(len(files)):
         
 
     # Actually quantify the period
-    slope = minuit_pendelum.values['slope']
-    slope_error = minuit_pendelum.errors['slope']
+    slopes.append(minuit_pendelum.values['slope'])
+    slope_errors.append(minuit_pendelum.errors['slope'])
 
 fig.subplots_adjust(top=0.9, right=0.95, left=0.06, wspace=0.05)
 fig.savefig('Pendelum.png', dpi=300)
@@ -361,7 +381,21 @@ g = g_Pendulum(T_mean, T_sig_mean, L_mean, L_mean_sig)
 #print("The value of the gravitional acceleration, with no error propagation, is: "f"{g:.3f}")
 
 
-# %%
-# Assuming the period and length are uncorrelated
+# %% Perform weighted mean of slopes
+# Combine values to get weighted mean and error prop of T
+T_mean, T_sig_mean = weighted_error_prop_mean(slopes, slope_errors, "period")
 
-g_Pendulum(T, T_sig, L, L_sig)
+
+L_mean, L_mean_sig = weighted_error_prop_mean(np.concatenate([Length, Length_las]),
+                                              np.concatenate([Length_sig, Length_las_sig]), "L")
+
+g_las = g_Pendulum(T_mean, T_sig_mean, L_las_mean, L_las_mean_sig)
+g = g_Pendulum(T_mean, T_sig_mean, L_mean, L_mean_sig)
+
+print('g', np.round(g, 4))
+print('Respective error contribution',
+      error_contribution(T_mean, T_sig_mean, L_mean, L_mean_sig))
+
+print('Variables used:')
+print('Period', np.round(T_mean, 3), np.round(T_sig_mean, 3))
+print('Length', np.round(L_mean, 3), np.round(L_mean_sig, 3))
